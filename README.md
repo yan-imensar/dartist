@@ -82,6 +82,81 @@ Bring it up:
 docker compose up -d
 ```
 
+### Kubernetes
+
+Minimal Deployment + Service + Ingress. Save as `dartist.yaml` and `kubectl apply -f dartist.yaml`. Replace the image tag, host and Ingress class to match your cluster.
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dartist
+  labels: { app: dartist }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: dartist }
+  template:
+    metadata:
+      labels: { app: dartist }
+    spec:
+      containers:
+        - name: dartist
+          image: ghcr.io/yan-imensar/dartist:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+          env:
+            - name: ORIGIN
+              value: https://dartist.example.com
+          readinessProbe:
+            httpGet: { path: /, port: 3000 }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /, port: 3000 }
+            periodSeconds: 30
+          resources:
+            requests: { cpu: 25m, memory: 64Mi }
+            limits: { cpu: 250m, memory: 256Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dartist
+spec:
+  selector: { app: dartist }
+  ports:
+    - port: 80
+      targetPort: 3000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: dartist
+  # Add your auth annotations here, e.g. NetBird / oauth2-proxy forward-auth.
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: dartist.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: dartist
+                port: { number: 80 }
+```
+
+If the GHCR package is **private**, create a pull secret first and reference it via `spec.template.spec.imagePullSecrets`:
+
+```sh
+kubectl create secret docker-registry ghcr \
+  --docker-server=ghcr.io \
+  --docker-username=<github-user> \
+  --docker-password=<github-pat-with-read:packages>
+```
+
 ### Behind a reverse proxy
 
 The app does not terminate TLS and does not handle authentication. Front it with whatever you already run:

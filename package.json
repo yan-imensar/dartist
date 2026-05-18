@@ -47,6 +47,7 @@
 	},
 	"dependencies": {
 		"dexie": "^4.4.2",
+		"pocketbase": "^0.26.9",
 		"uuid": "^14.0.0"
 	}
 }

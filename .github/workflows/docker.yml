@@ -51,8 +51,8 @@ jobs:
             type=sha,prefix=sha-
             type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'main') }}
           labels: |
-            org.opencontainers.image.title=Darts
-            org.opencontainers.image.description=Local-first darts scoring PWA
+            org.opencontainers.image.title=Dartist
+            org.opencontainers.image.description=Dartist — local-first darts scoring PWA
             org.opencontainers.image.licenses=MIT
 
       - name: Build and push

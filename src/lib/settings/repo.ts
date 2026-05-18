@@ -1,9 +1,9 @@
-import type { DartsDb } from '$lib/db/client';
+import type { DartistDb } from '$lib/db/client';
 import { getDb } from '$lib/db/client';
 import { DEFAULT_SETTINGS, SETTINGS_KEYS, type AppSettings, type SettingsKey } from './types';
 
 export class SettingsRepository {
-	constructor(private readonly db: DartsDb = getDb()) {}
+	constructor(private readonly db: DartistDb = getDb()) {}
 
 	async get<T>(key: SettingsKey): Promise<T | undefined> {
 		const row = await this.db.settings.get(key);

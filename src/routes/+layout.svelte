@@ -21,7 +21,7 @@
 
 <svelte:head>
 	<link rel="icon" href={favicon} />
-	<title>Darts</title>
+	<title>Dartist</title>
 </svelte:head>
 
 <div class="flex min-h-dvh flex-col">

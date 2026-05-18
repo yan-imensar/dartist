@@ -5,7 +5,7 @@
 </script>
 
 <section class="flex flex-col items-center gap-6 pt-10 text-center">
-	<h1 class="text-4xl font-bold">Darts</h1>
+	<h1 class="text-4xl font-bold">Dartist</h1>
 	<p class="max-w-md text-board-100/70">
 		Local-first scoring app for X01 matches. Works offline, your data stays on your device.
 	</p>

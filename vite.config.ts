@@ -12,9 +12,9 @@ export default defineConfig({
 			registerType: 'autoUpdate',
 			injectRegister: 'auto',
 			manifest: {
-				name: 'Darts',
-				short_name: 'Darts',
-				description: 'Local-first darts scoring app for X01 matches.',
+				name: 'Dartist',
+				short_name: 'Dartist',
+				description: 'Dartist — local-first darts scoring app for X01 matches.',
 				theme_color: '#0a0f0d',
 				background_color: '#0a0f0d',
 				display: 'standalone',

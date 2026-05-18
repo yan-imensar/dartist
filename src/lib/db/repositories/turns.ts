@@ -1,4 +1,4 @@
-import type { DartsDb } from '../client';
+import type { DartistDb } from '../client';
 import { newId, nowIso } from '../ids';
 import type { DartThrow } from '$lib/game/types';
 import type { Turn } from '../schema';
@@ -18,7 +18,7 @@ export type RecordTurnInput = {
 };
 
 export class TurnsRepository {
-	constructor(private readonly db: DartsDb) {}
+	constructor(private readonly db: DartistDb) {}
 
 	async record(input: RecordTurnInput): Promise<Turn> {
 		const now = nowIso();

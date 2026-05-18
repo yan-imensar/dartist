@@ -1,4 +1,4 @@
-import type { DartsDb } from '../client';
+import type { DartistDb } from '../client';
 import { defaultX01Settings } from '$lib/game/x01';
 import { newId, nowIso } from '../ids';
 import type { GameMode } from '$lib/game/types';
@@ -17,7 +17,7 @@ export type StartMatchResult = {
 };
 
 export class MatchesRepository {
-	constructor(private readonly db: DartsDb) {}
+	constructor(private readonly db: DartistDb) {}
 
 	async start(input: StartMatchInput): Promise<StartMatchResult> {
 		if (input.playerIds.length === 0) throw new Error('at least one player required');

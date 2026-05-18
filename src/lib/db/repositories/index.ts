@@ -1,4 +1,4 @@
-import type { DartsDb } from '../client';
+import type { DartistDb } from '../client';
 import { getDb } from '../client';
 import { MatchesRepository } from './matches';
 import { PlayersRepository } from './players';
@@ -10,7 +10,7 @@ export type Repositories = {
 	turns: TurnsRepository;
 };
 
-export function createRepositories(db: DartsDb = getDb()): Repositories {
+export function createRepositories(db: DartistDb = getDb()): Repositories {
 	return {
 		players: new PlayersRepository(db),
 		matches: new MatchesRepository(db),

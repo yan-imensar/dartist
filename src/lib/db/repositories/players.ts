@@ -1,4 +1,4 @@
-import type { DartsDb } from '../client';
+import type { DartistDb } from '../client';
 import { newId, nowIso } from '../ids';
 import type { Player } from '../schema';
 
@@ -11,7 +11,7 @@ export type CreatePlayerInput = {
 export type UpdatePlayerInput = Partial<Pick<Player, 'name' | 'color' | 'avatarUrl'>>;
 
 export class PlayersRepository {
-	constructor(private readonly db: DartsDb) {}
+	constructor(private readonly db: DartistDb) {}
 
 	async create(input: CreatePlayerInput): Promise<Player> {
 		const name = input.name.trim();

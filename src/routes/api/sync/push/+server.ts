@@ -6,7 +6,7 @@ import { ServerSyncRepository } from '$lib/server/sync-repo';
 import type { SyncPushBody, SyncPushResponse } from '$lib/sync/types';
 
 export const POST: RequestHandler = async ({ request }) => {
-	const owner = getOwner(request);
+	const owner = getOwner();
 	const body = (await request.json()) as SyncPushBody;
 	const repo = new ServerSyncRepository(getDb());
 

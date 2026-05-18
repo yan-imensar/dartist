@@ -126,7 +126,8 @@
 			<h2 class="text-sm font-semibold tracking-wider text-board-100/70 uppercase">Sync</h2>
 			<p class="text-sm text-board-100/70">
 				Push local players, matches and turns to the server, then pull anything updated on another
-				device. The server identifies you via your reverse-proxy auth header.
+				device. All your devices share a single data namespace; gate network access at the
+				reverse-proxy layer.
 			</p>
 			<div class="flex items-center justify-between text-sm">
 				<span class="text-board-100/60">
@@ -185,9 +186,9 @@
 				Access control
 			</h2>
 			<p>
-				This app does not handle authentication itself. When served behind an authenticating reverse
-				proxy (e.g. PocketID via Ingress forward-auth), the proxy gates access and the sync
-				endpoints read the identity header to scope data per user.
+				This app does not handle authentication itself. Run it behind an authenticating reverse
+				proxy (e.g. PocketID via Ingress forward-auth) if you want to gate access. The sync database
+				is single-tenant — all clients share the same namespace.
 			</p>
 		</section>
 	{/if}

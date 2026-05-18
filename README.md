@@ -71,11 +71,6 @@ services:
       PORT: '3000'
       HOST: 0.0.0.0
       DATA_DIR: /data
-      # Forward-auth header the reverse proxy sets per user (default).
-      SYNC_AUTH_HEADER: X-Forwarded-User
-      # Only useful in dev: bypass forward-auth.
-      # ALLOW_ANON_SYNC: 'true'
-      # DEV_FAKE_USER: 'me'
     volumes:
       - dartist-data:/data
     healthcheck:
@@ -135,8 +130,6 @@ spec:
               value: https://dartist.example.com
             - name: DATA_DIR
               value: /data
-            - name: SYNC_AUTH_HEADER
-              value: X-Forwarded-User
           volumeMounts:
             - name: data
               mountPath: /data

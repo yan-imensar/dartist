@@ -1,2 +1,29 @@
 @import 'tailwindcss';
 @plugin '@tailwindcss/forms';
+
+@theme {
+	--font-sans:
+		'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+	--color-board-50: #f4f7f6;
+	--color-board-100: #e1e9e6;
+	--color-board-700: #1f2a26;
+	--color-board-800: #131a17;
+	--color-board-900: #0a0f0d;
+	--color-accent-500: #d4a017;
+	--color-accent-600: #b08410;
+	--color-danger-500: #b91c1c;
+	--color-danger-600: #7f1d1d;
+}
+
+html,
+body {
+	background-color: var(--color-board-900);
+	color: var(--color-board-50);
+	font-family: var(--font-sans);
+	-webkit-font-smoothing: antialiased;
+	min-height: 100dvh;
+}
+
+button {
+	font-family: inherit;
+}

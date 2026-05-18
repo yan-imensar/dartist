@@ -15,6 +15,7 @@
 	let selectedIds = $state<string[]>([]);
 	let startingScore = $state<301 | 501>(501);
 	let doubleOut = $state(true);
+	let bestOfLegs = $state<1 | 3 | 5>(1);
 	let loading = $state(true);
 	let activeMatch = $state<Match | null>(null);
 
@@ -36,7 +37,7 @@
 
 	async function startMatch() {
 		if (selectedIds.length === 0) return;
-		const settings = { ...defaultX01Settings(startingScore), doubleOut };
+		const settings = { ...defaultX01Settings(startingScore), doubleOut, bestOfLegs };
 		await store.start({ mode: 'x01', playerIds: selectedIds, settings });
 		const matchId = store.snapshot?.matchId;
 		if (matchId) await goto(resolve('/play/[matchId]', { matchId }));
@@ -109,6 +110,25 @@
 		</span>
 		<input type="checkbox" class="size-5" bind:checked={doubleOut} />
 	</label>
+
+	<fieldset class="flex flex-col gap-2">
+		<legend class="text-sm font-semibold tracking-wider text-board-100/70 uppercase">
+			Match format
+		</legend>
+		<div class="flex gap-2">
+			{#each [1, 3, 5] as value (value)}
+				<button
+					type="button"
+					class="flex-1 rounded-lg border px-4 py-3 font-semibold transition {bestOfLegs === value
+						? 'border-accent-500 bg-accent-500/10 text-accent-500'
+						: 'border-board-700 bg-board-800 text-board-50'}"
+					onclick={() => (bestOfLegs = value as 1 | 3 | 5)}
+				>
+					{value === 1 ? 'Single leg' : `Best of ${value}`}
+				</button>
+			{/each}
+		</div>
+	</fieldset>
 
 	<fieldset class="flex flex-col gap-2">
 		<legend class="text-sm font-semibold tracking-wider text-board-100/70 uppercase">

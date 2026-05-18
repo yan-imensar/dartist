@@ -135,3 +135,80 @@ describe('MatchSession.load', () => {
 		await expect(MatchSession.load(harness.repos, 'missing')).rejects.toThrow(/missing/);
 	});
 });
+
+describe('MatchSession — best-of-X legs', () => {
+	let harness: TestHarness;
+
+	beforeEach(async () => {
+		harness = await createTestDb();
+	});
+
+	afterEach(async () => {
+		await harness.close();
+	});
+
+	async function startBestOf3() {
+		const a = await harness.repos.players.create({ name: 'Alice' });
+		const b = await harness.repos.players.create({ name: 'Bob' });
+		const session = await MatchSession.start(harness.repos, {
+			mode: 'x01',
+			playerIds: [a.id, b.id],
+			settings: { ...defaultX01Settings(40), bestOfLegs: 3 }
+		});
+		return { a, b, session };
+	}
+
+	const checkout = [{ segment: 20, multiplier: 2, score: 40 }] as const;
+
+	it('creates a new Leg row when the match advances to the next leg', async () => {
+		const { session } = await startBestOf3();
+		await session.playTurn({ scoreEntered: 40, darts: [...checkout] });
+		const legs = await harness.repos.matches.listLegs(session.state.matchId);
+		expect(legs.map((l) => l.legIndex)).toEqual([0, 1]);
+		expect(legs[0].status).toBe('finished');
+		expect(legs[1].status).toBe('active');
+	});
+
+	it('finishes the match (and final leg) when a player reaches majority', async () => {
+		const { a, session } = await startBestOf3();
+		await session.playTurn({ scoreEntered: 40, darts: [...checkout] });
+		await session.playTurn({ scoreEntered: 0 });
+		await session.playTurn({ scoreEntered: 40, darts: [...checkout] });
+
+		expect(session.state.status).toBe('finished');
+		expect(session.state.winnerPlayerId).toBe(a.id);
+
+		const match = await harness.repos.matches.get(session.state.matchId);
+		expect(match?.status).toBe('finished');
+		const legs = await harness.repos.matches.listLegs(session.state.matchId);
+		expect(legs).toHaveLength(2);
+		expect(legs.every((l) => l.status === 'finished')).toBe(true);
+	});
+
+	it('undo rolls back a leg transition, removing the newer Leg row', async () => {
+		const { session } = await startBestOf3();
+		await session.playTurn({ scoreEntered: 40, darts: [...checkout] });
+		expect((await harness.repos.matches.listLegs(session.state.matchId)).length).toBe(2);
+
+		await session.undoLast();
+		const legs = await harness.repos.matches.listLegs(session.state.matchId);
+		expect(legs).toHaveLength(1);
+		expect(legs[0].status).toBe('active');
+		expect(session.state.legIndex).toBe(0);
+	});
+
+	it('rehydration via load() preserves legs map and supports playing the next turn', async () => {
+		const { a, session } = await startBestOf3();
+		await session.playTurn({ scoreEntered: 40, darts: [...checkout] });
+
+		const reloaded = await MatchSession.load(harness.repos, session.state.matchId);
+		expect(reloaded.state.legIndex).toBe(1);
+		expect(reloaded.state.legsWon[a.id]).toBe(1);
+
+		await reloaded.playTurn({ scoreEntered: 0 });
+		const turns = await harness.repos.turns.listForMatch(session.state.matchId);
+		const lastTurn = turns[turns.length - 1];
+		expect(lastTurn.legIndex).toBe(1);
+		expect(lastTurn.legId).toBeTruthy();
+	});
+});

@@ -32,6 +32,19 @@ export class DartistDb extends Dexie {
 			syncQueue: 'id, entityType, entityId, createdAt',
 			settings: 'key'
 		});
+		this.version(2)
+			.stores({
+				turns:
+					'id, matchId, playerId, legId, legIndex, [matchId+turnIndex], [legId+turnIndex], syncState'
+			})
+			.upgrade(async (tx) => {
+				await tx
+					.table<Turn>('turns')
+					.toCollection()
+					.modify((t) => {
+						if (t.legIndex === undefined) t.legIndex = 0;
+					});
+			});
 	}
 }
 

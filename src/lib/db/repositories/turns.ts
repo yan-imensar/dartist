@@ -7,6 +7,7 @@ export type RecordTurnInput = {
 	matchId: string;
 	playerId: string;
 	legId: string | null;
+	legIndex: number;
 	turnIndex: number;
 	scoreBefore: number;
 	scoreEntered: number;
@@ -27,6 +28,7 @@ export class TurnsRepository {
 			matchId: input.matchId,
 			playerId: input.playerId,
 			legId: input.legId,
+			legIndex: input.legIndex,
 			turnIndex: input.turnIndex,
 			createdAt: now,
 			enteredAt: now,
@@ -44,6 +46,10 @@ export class TurnsRepository {
 		};
 		await this.db.turns.add(turn);
 		return turn;
+	}
+
+	async deleteById(id: string): Promise<void> {
+		await this.db.turns.delete(id);
 	}
 
 	async listForMatch(matchId: string): Promise<Turn[]> {
@@ -79,6 +85,7 @@ export class TurnsRepository {
 			matchId: replacement.matchId,
 			playerId: replacement.playerId,
 			legId: replacement.legId,
+			legIndex: replacement.legIndex,
 			turnIndex: replacement.turnIndex,
 			createdAt: now,
 			enteredAt: now,

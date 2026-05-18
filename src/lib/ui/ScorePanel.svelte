@@ -5,9 +5,11 @@
 		players: ActiveMatchPlayer[];
 		scores: Record<string, number>;
 		currentPlayerId: string;
+		legsWon?: Record<string, number>;
+		showLegs?: boolean;
 	};
 
-	let { players, scores, currentPlayerId }: Props = $props();
+	let { players, scores, currentPlayerId, legsWon, showLegs = false }: Props = $props();
 </script>
 
 <ul class="grid gap-2" style="grid-template-columns: repeat({Math.min(players.length, 2)}, 1fr);">
@@ -21,6 +23,11 @@
 		>
 			<span class="text-sm tracking-wider text-board-100/70 uppercase">{p.name}</span>
 			<span class="text-5xl font-bold tabular-nums">{scores[p.id]}</span>
+			{#if showLegs && legsWon}
+				<span class="text-xs text-board-100/60 tabular-nums">
+					Legs: <span class="text-board-100">{legsWon[p.id] ?? 0}</span>
+				</span>
+			{/if}
 		</li>
 	{/each}
 </ul>

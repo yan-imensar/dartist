@@ -100,11 +100,16 @@
 						? 's'
 						: ''}
 				</h1>
-				{#if currentPlayer}
-					<p class="text-sm text-board-100/70">
-						Current: <span class="font-semibold text-accent-500">{currentPlayer.name}</span>
-					</p>
-				{/if}
+				<p class="text-sm text-board-100/70">
+					{#if (snapshot.settings.bestOfLegs ?? 1) > 1}
+						Best of {snapshot.settings.bestOfLegs} · Leg {snapshot.legIndex + 1}
+					{:else}
+						Single leg
+					{/if}
+					{#if currentPlayer}
+						· Current: <span class="font-semibold text-accent-500">{currentPlayer.name}</span>
+					{/if}
+				</p>
 			</div>
 			<Button variant="ghost" size="sm" onclick={() => goto(resolve('/history'))}>Exit</Button>
 		</header>
@@ -113,6 +118,8 @@
 			players={snapshot.players}
 			scores={snapshot.scores}
 			currentPlayerId={currentPlayer?.id ?? ''}
+			legsWon={snapshot.legsWon}
+			showLegs={(snapshot.settings.bestOfLegs ?? 1) > 1}
 		/>
 
 		<CheckoutHint score={currentScore} />

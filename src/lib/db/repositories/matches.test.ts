@@ -50,7 +50,7 @@ describe('MatchesRepository', () => {
 		expect(leg?.matchId).toBe(match.id);
 	});
 
-	it('finishes a match: status finished, winner set, active leg finished', async () => {
+	it('finishes a match: status finished, winner set', async () => {
 		const [a, b] = await makePlayers(['Alice', 'Bob']);
 		const { match } = await harness.repos.matches.start({
 			mode: 'x01',
@@ -61,9 +61,51 @@ describe('MatchesRepository', () => {
 		expect(finished?.status).toBe('finished');
 		expect(finished?.winnerPlayerId).toBe(a.id);
 		expect(finished?.finishedAt).not.toBeNull();
-		const leg = await harness.db.legs.where('matchId').equals(match.id).first();
-		expect(leg?.status).toBe('finished');
-		expect(leg?.winnerPlayerId).toBe(a.id);
+	});
+
+	it('finishLeg / reopenLeg flip leg status independently', async () => {
+		const [a] = await makePlayers(['Solo']);
+		const { leg } = await harness.repos.matches.start({
+			mode: 'x01',
+			playerIds: [a.id]
+		});
+		await harness.repos.matches.finishLeg(leg.id, a.id);
+		const finished = await harness.db.legs.get(leg.id);
+		expect(finished?.status).toBe('finished');
+		expect(finished?.winnerPlayerId).toBe(a.id);
+
+		await harness.repos.matches.reopenLeg(leg.id);
+		const reopened = await harness.db.legs.get(leg.id);
+		expect(reopened?.status).toBe('active');
+		expect(reopened?.winnerPlayerId).toBeNull();
+	});
+
+	it('createLeg adds a new leg row, listLegs orders by legIndex', async () => {
+		const [a] = await makePlayers(['Solo']);
+		const { match } = await harness.repos.matches.start({
+			mode: 'x01',
+			playerIds: [a.id]
+		});
+		const leg1 = await harness.repos.matches.createLeg(match.id, 1);
+		const leg2 = await harness.repos.matches.createLeg(match.id, 2);
+		const legs = await harness.repos.matches.listLegs(match.id);
+		expect(legs.map((l) => l.legIndex)).toEqual([0, 1, 2]);
+		expect(legs[1].id).toBe(leg1.id);
+		expect(legs[2].id).toBe(leg2.id);
+	});
+
+	it('reopen flips a finished match back to active', async () => {
+		const [a] = await makePlayers(['Solo']);
+		const { match } = await harness.repos.matches.start({
+			mode: 'x01',
+			playerIds: [a.id]
+		});
+		await harness.repos.matches.finish(match.id, a.id);
+		await harness.repos.matches.reopen(match.id);
+		const reloaded = await harness.repos.matches.get(match.id);
+		expect(reloaded?.status).toBe('active');
+		expect(reloaded?.winnerPlayerId).toBeNull();
+		expect(reloaded?.finishedAt).toBeNull();
 	});
 
 	it('findActive returns the in-progress match', async () => {

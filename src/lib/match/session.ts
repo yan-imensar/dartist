@@ -2,6 +2,7 @@ import { defaultX01Settings } from '$lib/game/x01';
 import {
 	createMatchState,
 	currentPlayer,
+	deriveState,
 	playTurn as applyPlayTurn,
 	undoLastTurn,
 	type ActiveMatchPlayer,
@@ -20,10 +21,11 @@ export type StartSessionInput = {
 };
 
 export class MatchSession {
+	private readonly legs = new Map<number, string>();
+
 	private constructor(
 		private readonly repos: Repositories,
-		private currentState: ActiveMatchState,
-		private readonly legId: string | null
+		private currentState: ActiveMatchState
 	) {}
 
 	get state(): ActiveMatchState {
@@ -42,60 +44,48 @@ export class MatchSession {
 			settings
 		});
 
-		const players: ActiveMatchPlayer[] = await Promise.all(
-			matchPlayers.map(async (mp) => {
-				const p = await repos.players.get(mp.playerId);
-				return {
-					id: mp.playerId,
-					name: p?.name ?? '?',
-					startingScore: mp.startingScore
-				};
-			})
-		);
-
+		const players = await loadPlayers(repos, matchPlayers);
 		const state = createMatchState({ matchId: match.id, settings, players });
-		return new MatchSession(repos, state, leg.id);
+		const session = new MatchSession(repos, state);
+		session.legs.set(0, leg.id);
+		return session;
 	}
 
 	static async load(repos: Repositories, matchId: string): Promise<MatchSession> {
 		const match = await repos.matches.get(matchId);
 		if (!match) throw new Error(`match ${matchId} not found`);
 
-		const [matchPlayers, leg, turns] = await Promise.all([
+		const [matchPlayers, legs, turns] = await Promise.all([
 			repos.matches.getMatchPlayers(matchId),
-			repos.matches.getActiveLeg(matchId),
+			repos.matches.listLegs(matchId),
 			repos.turns.listForMatch(matchId)
 		]);
 
-		const players: ActiveMatchPlayer[] = await Promise.all(
-			matchPlayers.map(async (mp) => {
-				const p = await repos.players.get(mp.playerId);
-				return {
-					id: mp.playerId,
-					name: p?.name ?? '?',
-					startingScore: mp.startingScore
-				};
-			})
-		);
-
-		const settings = match.settings as X01Settings;
-		const initial = createMatchState({ matchId, settings, players });
+		const players = await loadPlayers(repos, matchPlayers);
+		const settings = normalizeSettings(match.settings as X01Settings);
 		const activeTurns = turns
 			.filter((t) => t.revertedAt === null)
-			.sort((a, b) => a.turnIndex - b.turnIndex);
+			.sort((a, b) => a.turnIndex - b.turnIndex)
+			.map(toActiveTurn);
 
-		const state = replayTurns(initial, activeTurns);
-		return new MatchSession(repos, state, leg?.id ?? null);
+		const state = deriveState(matchId, settings, players, activeTurns);
+		const session = new MatchSession(repos, state);
+		for (const l of legs) session.legs.set(l.legIndex, l.id);
+		return session;
 	}
 
 	async playTurn(input: PlayTurnInput): Promise<ActiveMatchState> {
 		const playerId = this.currentPlayerId;
+		const beforeLegIndex = this.currentState.legIndex;
 		const { state: next, turn } = applyPlayTurn(this.currentState, input);
+
+		const legIdForTurn = this.legs.get(beforeLegIndex) ?? null;
 
 		await this.repos.turns.record({
 			matchId: this.currentState.matchId,
 			playerId,
-			legId: this.legId,
+			legId: legIdForTurn,
+			legIndex: turn.legIndex,
 			turnIndex: turn.turnIndex,
 			scoreBefore: turn.scoreBefore,
 			scoreEntered: turn.scoreEntered,
@@ -105,6 +95,16 @@ export class MatchSession {
 			isCheckout: turn.isCheckout,
 			darts: turn.darts
 		});
+
+		if (turn.isCheckout) {
+			const finishingLegId = this.legs.get(beforeLegIndex);
+			if (finishingLegId) await this.repos.matches.finishLeg(finishingLegId, playerId);
+		}
+
+		if (next.legIndex > beforeLegIndex && next.status === 'active') {
+			const newLeg = await this.repos.matches.createLeg(this.currentState.matchId, next.legIndex);
+			this.legs.set(next.legIndex, newLeg.id);
+		}
 
 		if (next.status === 'finished' && next.winnerPlayerId) {
 			await this.repos.matches.finish(this.currentState.matchId, next.winnerPlayerId);
@@ -116,41 +116,74 @@ export class MatchSession {
 
 	async undoLast(): Promise<ActiveMatchState> {
 		if (this.currentState.turns.length === 0) return this.currentState;
+
+		const beforeStatus = this.currentState.status;
+		const beforeLegIndex = this.currentState.legIndex;
+		const lastTurn = this.currentState.turns[this.currentState.turns.length - 1];
+
 		await this.repos.turns.revertLast(this.currentState.matchId);
-		this.currentState = undoLastTurn(this.currentState);
-		return this.currentState;
+
+		const next = undoLastTurn(this.currentState);
+
+		if (lastTurn.isCheckout) {
+			const legIdOfFinishedLeg = this.legs.get(lastTurn.legIndex);
+			if (legIdOfFinishedLeg) await this.repos.matches.reopenLeg(legIdOfFinishedLeg);
+
+			if (beforeStatus === 'active' && beforeLegIndex > lastTurn.legIndex) {
+				const newerLegId = this.legs.get(beforeLegIndex);
+				if (newerLegId) {
+					await this.repos.matches.deleteLeg(newerLegId);
+					this.legs.delete(beforeLegIndex);
+				}
+			}
+
+			if (beforeStatus === 'finished') {
+				await this.repos.matches.reopen(this.currentState.matchId);
+			}
+		}
+
+		this.currentState = next;
+		return next;
 	}
 }
 
-function replayTurns(initial: ActiveMatchState, turns: Turn[]): ActiveMatchState {
-	let state = initial;
-	for (const t of turns) {
-		const turnEntry: ActiveTurn = {
-			playerId: t.playerId,
-			turnIndex: t.turnIndex,
-			scoreBefore: t.scoreBefore,
-			scoreEntered: t.scoreEntered,
-			scoreApplied: t.scoreApplied,
-			scoreAfter: t.scoreAfter,
-			isBust: t.isBust,
-			isCheckout: t.isCheckout,
-			darts: t.darts
-		};
-		const scores = { ...state.scores, [t.playerId]: t.scoreAfter };
-		const nextTurns = [...state.turns, turnEntry];
-		if (t.isCheckout) {
-			state = {
-				...state,
-				scores,
-				turns: nextTurns,
-				status: 'finished',
-				winnerPlayerId: t.playerId
+function normalizeSettings(settings: X01Settings): X01Settings {
+	return {
+		startingScore: settings.startingScore,
+		doubleOut: settings.doubleOut,
+		straightIn: settings.straightIn,
+		maxDartsPerTurn: settings.maxDartsPerTurn,
+		bestOfLegs: settings.bestOfLegs ?? 1
+	};
+}
+
+async function loadPlayers(
+	repos: Repositories,
+	matchPlayers: { playerId: string; startingScore: number }[]
+): Promise<ActiveMatchPlayer[]> {
+	return Promise.all(
+		matchPlayers.map(async (mp) => {
+			const p = await repos.players.get(mp.playerId);
+			return {
+				id: mp.playerId,
+				name: p?.name ?? '?',
+				startingScore: mp.startingScore
 			};
-		} else {
-			const playerIdx = state.players.findIndex((p) => p.id === t.playerId);
-			const nextIdx = playerIdx >= 0 ? (playerIdx + 1) % state.players.length : 0;
-			state = { ...state, scores, turns: nextTurns, currentPlayerIndex: nextIdx };
-		}
-	}
-	return state;
+		})
+	);
+}
+
+function toActiveTurn(t: Turn): ActiveTurn {
+	return {
+		playerId: t.playerId,
+		turnIndex: t.turnIndex,
+		legIndex: t.legIndex ?? 0,
+		scoreBefore: t.scoreBefore,
+		scoreEntered: t.scoreEntered,
+		scoreApplied: t.scoreApplied,
+		scoreAfter: t.scoreAfter,
+		isBust: t.isBust,
+		isCheckout: t.isCheckout,
+		darts: t.darts
+	};
 }

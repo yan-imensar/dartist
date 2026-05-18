@@ -27,6 +27,7 @@ describe('TurnsRepository', () => {
 			matchId: match.id,
 			playerId: player.id,
 			legId: leg.id,
+			legIndex: 0,
 			turnIndex: 0,
 			scoreBefore: 501,
 			scoreEntered: 60,
@@ -45,7 +46,7 @@ describe('TurnsRepository', () => {
 
 	it('lists turns for a match in turnIndex order', async () => {
 		const { player, match, leg } = await setup();
-		const ctx = { matchId: match.id, playerId: player.id, legId: leg.id };
+		const ctx = { matchId: match.id, playerId: player.id, legId: leg.id, legIndex: 0 };
 		await harness.repos.turns.record({
 			...ctx,
 			turnIndex: 1,
@@ -72,7 +73,7 @@ describe('TurnsRepository', () => {
 
 	it('revertLast marks the most recent active turn as reverted', async () => {
 		const { player, match, leg } = await setup();
-		const ctx = { matchId: match.id, playerId: player.id, legId: leg.id };
+		const ctx = { matchId: match.id, playerId: player.id, legId: leg.id, legIndex: 0 };
 		const t0 = await harness.repos.turns.record({
 			...ctx,
 			turnIndex: 0,
@@ -103,7 +104,7 @@ describe('TurnsRepository', () => {
 
 	it('correct() reverts original and inserts a correction linked via correctionOfTurnId', async () => {
 		const { player, match, leg } = await setup();
-		const ctx = { matchId: match.id, playerId: player.id, legId: leg.id };
+		const ctx = { matchId: match.id, playerId: player.id, legId: leg.id, legIndex: 0 };
 		const original = await harness.repos.turns.record({
 			...ctx,
 			turnIndex: 0,

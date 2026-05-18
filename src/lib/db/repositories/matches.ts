@@ -95,32 +95,74 @@ export class MatchesRepository {
 	}
 
 	async finish(matchId: string, winnerPlayerId: string): Promise<void> {
-		const now = nowIso();
-		await this.db.transaction('rw', this.db.matches, this.db.legs, async () => {
-			const match = await this.db.matches.get(matchId);
-			if (!match) throw new Error(`match ${matchId} not found`);
-			await this.db.matches.put({
-				...match,
-				status: 'finished',
-				finishedAt: now,
-				updatedAt: now,
-				winnerPlayerId,
-				syncState: match.syncState === 'synced' ? 'pending' : match.syncState
-			});
-			const activeLeg = await this.db.legs
-				.where('matchId')
-				.equals(matchId)
-				.filter((l) => l.status === 'active')
-				.first();
-			if (activeLeg) {
-				await this.db.legs.put({
-					...activeLeg,
-					status: 'finished',
-					finishedAt: now,
-					winnerPlayerId
-				});
-			}
+		const match = await this.db.matches.get(matchId);
+		if (!match) throw new Error(`match ${matchId} not found`);
+		await this.db.matches.put({
+			...match,
+			status: 'finished',
+			finishedAt: nowIso(),
+			updatedAt: nowIso(),
+			winnerPlayerId,
+			syncState: match.syncState === 'synced' ? 'pending' : match.syncState
 		});
+	}
+
+	async reopen(matchId: string): Promise<void> {
+		const match = await this.db.matches.get(matchId);
+		if (!match) return;
+		await this.db.matches.put({
+			...match,
+			status: 'active',
+			finishedAt: null,
+			updatedAt: nowIso(),
+			winnerPlayerId: null,
+			syncState: match.syncState === 'synced' ? 'pending' : match.syncState
+		});
+	}
+
+	async createLeg(matchId: string, legIndex: number): Promise<Leg> {
+		const leg: Leg = {
+			id: newId(),
+			matchId,
+			legIndex,
+			status: 'active',
+			startedAt: nowIso(),
+			finishedAt: null,
+			winnerPlayerId: null
+		};
+		await this.db.legs.add(leg);
+		return leg;
+	}
+
+	async finishLeg(legId: string, winnerPlayerId: string): Promise<void> {
+		const leg = await this.db.legs.get(legId);
+		if (!leg) return;
+		await this.db.legs.put({
+			...leg,
+			status: 'finished',
+			finishedAt: nowIso(),
+			winnerPlayerId
+		});
+	}
+
+	async reopenLeg(legId: string): Promise<void> {
+		const leg = await this.db.legs.get(legId);
+		if (!leg) return;
+		await this.db.legs.put({
+			...leg,
+			status: 'active',
+			finishedAt: null,
+			winnerPlayerId: null
+		});
+	}
+
+	async deleteLeg(legId: string): Promise<void> {
+		await this.db.legs.delete(legId);
+	}
+
+	async listLegs(matchId: string): Promise<Leg[]> {
+		const rows = await this.db.legs.where('matchId').equals(matchId).toArray();
+		return rows.sort((a, b) => a.legIndex - b.legIndex);
 	}
 
 	async listFinished(): Promise<Match[]> {

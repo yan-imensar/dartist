@@ -1,5 +1,5 @@
 import type { DartThrow, X01Settings } from './types';
-import { applyX01Turn } from './x01';
+import { applyX01Turn, legsToWin } from './x01';
 
 export type ActiveMatchPlayer = {
 	id: string;
@@ -10,6 +10,7 @@ export type ActiveMatchPlayer = {
 export type ActiveTurn = {
 	playerId: string;
 	turnIndex: number;
+	legIndex: number;
 	scoreBefore: number;
 	scoreEntered: number;
 	scoreApplied: number;
@@ -27,6 +28,8 @@ export type ActiveMatchState = {
 	currentPlayerIndex: number;
 	scores: Record<string, number>;
 	turns: ActiveTurn[];
+	legIndex: number;
+	legsWon: Record<string, number>;
 	status: 'active' | 'finished';
 	winnerPlayerId: string | null;
 };
@@ -48,19 +51,7 @@ export function createMatchState(input: {
 	players: ActiveMatchPlayer[];
 }): ActiveMatchState {
 	if (input.players.length === 0) throw new Error('match needs at least one player');
-	const scores: Record<string, number> = {};
-	for (const p of input.players) scores[p.id] = p.startingScore;
-	return {
-		matchId: input.matchId,
-		mode: 'x01',
-		settings: input.settings,
-		players: input.players,
-		currentPlayerIndex: 0,
-		scores,
-		turns: [],
-		status: 'active',
-		winnerPlayerId: null
-	};
+	return deriveState(input.matchId, input.settings, input.players, []);
 }
 
 export function currentPlayer(state: ActiveMatchState): ActiveMatchPlayer {
@@ -83,6 +74,7 @@ export function playTurn(state: ActiveMatchState, input: PlayTurnInput): PlayTur
 	const turn: ActiveTurn = {
 		playerId: player.id,
 		turnIndex: state.turns.length,
+		legIndex: state.legIndex,
 		scoreBefore,
 		scoreEntered: input.scoreEntered,
 		scoreApplied: result.scoreApplied,
@@ -92,55 +84,63 @@ export function playTurn(state: ActiveMatchState, input: PlayTurnInput): PlayTur
 		darts: input.darts ?? []
 	};
 
-	const nextScores = { ...state.scores, [player.id]: result.scoreAfter };
-	const nextTurns = [...state.turns, turn];
-
-	if (result.isCheckout) {
-		return {
-			turn,
-			state: {
-				...state,
-				scores: nextScores,
-				turns: nextTurns,
-				status: 'finished',
-				winnerPlayerId: player.id
-			}
-		};
-	}
-
-	return {
-		turn,
-		state: {
-			...state,
-			scores: nextScores,
-			turns: nextTurns,
-			currentPlayerIndex: (state.currentPlayerIndex + 1) % state.players.length
-		}
-	};
+	const next = deriveState(state.matchId, state.settings, state.players, [...state.turns, turn]);
+	return { state: next, turn };
 }
 
 export function undoLastTurn(state: ActiveMatchState): ActiveMatchState {
 	if (state.turns.length === 0) return state;
-	const removed = state.turns[state.turns.length - 1];
-	const remainingTurns = state.turns.slice(0, -1);
-	const scores = recomputeScores(state.players, remainingTurns);
-	const playerIdx = state.players.findIndex((p) => p.id === removed.playerId);
-	return {
-		...state,
-		turns: remainingTurns,
-		scores,
-		currentPlayerIndex: playerIdx >= 0 ? playerIdx : state.currentPlayerIndex,
-		status: 'active',
-		winnerPlayerId: null
-	};
+	return deriveState(state.matchId, state.settings, state.players, state.turns.slice(0, -1));
 }
 
-function recomputeScores(
+export function deriveState(
+	matchId: string,
+	settings: X01Settings,
 	players: ActiveMatchPlayer[],
 	turns: ActiveTurn[]
-): Record<string, number> {
+): ActiveMatchState {
+	const needed = legsToWin(settings.bestOfLegs ?? 1);
 	const scores: Record<string, number> = {};
-	for (const p of players) scores[p.id] = p.startingScore;
-	for (const t of turns) scores[t.playerId] = t.scoreAfter;
-	return scores;
+	const legsWon: Record<string, number> = {};
+	for (const p of players) {
+		scores[p.id] = p.startingScore;
+		legsWon[p.id] = 0;
+	}
+
+	let legIndex = 0;
+	let currentPlayerIndex = 0;
+	let status: ActiveMatchState['status'] = 'active';
+	let winnerPlayerId: string | null = null;
+
+	for (const t of turns) {
+		scores[t.playerId] = t.scoreAfter;
+		if (t.isCheckout) {
+			legsWon[t.playerId] = (legsWon[t.playerId] ?? 0) + 1;
+			if (legsWon[t.playerId] >= needed) {
+				status = 'finished';
+				winnerPlayerId = t.playerId;
+			} else {
+				legIndex += 1;
+				for (const p of players) scores[p.id] = p.startingScore;
+				currentPlayerIndex = legIndex % players.length;
+			}
+		} else {
+			const idx = players.findIndex((p) => p.id === t.playerId);
+			currentPlayerIndex = idx >= 0 ? (idx + 1) % players.length : 0;
+		}
+	}
+
+	return {
+		matchId,
+		mode: 'x01',
+		settings,
+		players,
+		currentPlayerIndex,
+		scores,
+		turns,
+		legIndex,
+		legsWon,
+		status,
+		winnerPlayerId
+	};
 }

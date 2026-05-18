@@ -30,8 +30,14 @@ export function defaultX01Settings(startingScore = 501): X01Settings {
 		startingScore,
 		doubleOut: true,
 		straightIn: true,
-		maxDartsPerTurn: 3
+		maxDartsPerTurn: 3,
+		bestOfLegs: 1
 	};
+}
+
+export function legsToWin(bestOfLegs: number): number {
+	const n = Math.max(1, Math.floor(bestOfLegs));
+	return Math.floor(n / 2) + 1;
 }
 
 export function applyX01Turn(input: ApplyTurnInput): ApplyTurnResult {

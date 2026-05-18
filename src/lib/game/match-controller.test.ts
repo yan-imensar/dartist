@@ -6,6 +6,7 @@ import {
 	undoLastTurn,
 	type ActiveMatchPlayer
 } from './match-controller';
+import type { DartThrow } from './types';
 import { defaultX01Settings } from './x01';
 
 const settings = defaultX01Settings(501);
@@ -119,5 +120,56 @@ describe('match-controller', () => {
 		expect(reopened.status).toBe('active');
 		expect(reopened.winnerPlayerId).toBeNull();
 		expect(reopened.scores.a).toBe(40);
+	});
+});
+
+describe('match-controller — best-of-X legs', () => {
+	const bestOf3 = { ...defaultX01Settings(40), bestOfLegs: 3 };
+
+	function freshBestOfThree() {
+		return createMatchState({
+			matchId: 'm1',
+			settings: bestOf3,
+			players: [
+				{ id: 'a', name: 'Alice', startingScore: 40 },
+				{ id: 'b', name: 'Bob', startingScore: 40 }
+			]
+		});
+	}
+
+	function checkoutDart(): DartThrow[] {
+		return [{ segment: 20, multiplier: 2, score: 40 }];
+	}
+
+	it('starts a new leg on checkout when match still needs more wins', () => {
+		const s0 = freshBestOfThree();
+		const s1 = playTurn(s0, { scoreEntered: 40, darts: checkoutDart() }).state;
+		expect(s1.status).toBe('active');
+		expect(s1.legsWon).toEqual({ a: 1, b: 0 });
+		expect(s1.legIndex).toBe(1);
+		expect(s1.scores).toEqual({ a: 40, b: 40 });
+		expect(currentPlayer(s1).id).toBe('b');
+	});
+
+	it('finishes the match once the winning player reaches the majority', () => {
+		let state = freshBestOfThree();
+		state = playTurn(state, { scoreEntered: 40, darts: checkoutDart() }).state;
+		state = playTurn(state, { scoreEntered: 0 }).state;
+		state = playTurn(state, { scoreEntered: 40, darts: checkoutDart() }).state;
+		expect(state.status).toBe('finished');
+		expect(state.winnerPlayerId).toBe('a');
+		expect(state.legsWon).toEqual({ a: 2, b: 0 });
+	});
+
+	it('undo rewinds across leg transitions', () => {
+		let state = freshBestOfThree();
+		state = playTurn(state, { scoreEntered: 40, darts: checkoutDart() }).state;
+		expect(state.legIndex).toBe(1);
+
+		state = undoLastTurn(state);
+		expect(state.legIndex).toBe(0);
+		expect(state.legsWon).toEqual({ a: 0, b: 0 });
+		expect(state.scores.a).toBe(40);
+		expect(currentPlayer(state).id).toBe('a');
 	});
 });

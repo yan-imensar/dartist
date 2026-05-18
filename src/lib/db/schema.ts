@@ -67,6 +67,7 @@ export type Turn = {
 	matchId: string;
 	playerId: string;
 	legId: string | null;
+	legIndex: number;
 	turnIndex: number;
 	createdAt: string;
 	enteredAt: string;

@@ -13,6 +13,7 @@ export type X01Settings = {
 	doubleOut: boolean;
 	straightIn: boolean;
 	maxDartsPerTurn: number;
+	bestOfLegs: number;
 };
 
 export type BustReason = 'below_zero' | 'left_one' | 'double_out_required';

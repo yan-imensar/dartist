@@ -56,6 +56,7 @@ function turn(
 		matchId: overrides.matchId,
 		playerId: overrides.playerId,
 		legId: overrides.legId ?? `leg-${overrides.matchId}`,
+		legIndex: overrides.legIndex ?? 0,
 		turnIndex: overrides.turnIndex,
 		createdAt: '2025-01-01T00:00:00.000Z',
 		enteredAt: '2025-01-01T00:00:00.000Z',

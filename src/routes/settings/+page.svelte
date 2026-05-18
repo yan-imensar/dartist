@@ -2,18 +2,22 @@
 	import Button from '$lib/ui/Button.svelte';
 	import { SettingsRepository } from '$lib/settings/repo';
 	import { SETTINGS_KEYS } from '$lib/settings/types';
+	import { getSyncStore } from '$lib/sync/sync-store.svelte';
 	import { onMount } from 'svelte';
 
 	const repo = new SettingsRepository();
+	const sync = getSyncStore();
 
 	let deviceName = $state('');
 	let saved = $state<string | null>(null);
+	let lastSyncedAt = $state<string | null>(null);
 	let ready = $state(false);
 
 	onMount(async () => {
 		const settings = await repo.loadAll();
 		deviceName = settings.deviceName ?? '';
 		saved = settings.deviceName;
+		lastSyncedAt = settings.lastSyncedAt;
 		ready = true;
 	});
 
@@ -26,6 +30,16 @@
 			await repo.delete(SETTINGS_KEYS.deviceName);
 		}
 		saved = cleaned || null;
+	}
+
+	async function syncNow() {
+		try {
+			await sync.syncNow();
+			const refreshed = await repo.loadAll();
+			lastSyncedAt = refreshed.lastSyncedAt;
+		} catch {
+			// sync.error rendered below
+		}
 	}
 </script>
 
@@ -63,17 +77,42 @@
 			{/if}
 		</form>
 
+		<section class="flex flex-col gap-3 rounded-lg border border-board-700 bg-board-800 p-4">
+			<h2 class="text-sm font-semibold tracking-wider text-board-100/70 uppercase">Sync</h2>
+			<p class="text-sm text-board-100/70">
+				Push local players, matches and turns to the server, then pull anything updated on another
+				device. The server identifies you via your reverse-proxy auth header.
+			</p>
+			<div class="flex items-center justify-between text-sm">
+				<span class="text-board-100/60">
+					Last synced: {#if lastSyncedAt}
+						<span class="text-board-100">{new Date(lastSyncedAt).toLocaleString()}</span>
+					{:else}
+						<span class="text-board-100">never</span>
+					{/if}
+				</span>
+				<Button onclick={syncNow} disabled={sync.busy}>
+					{sync.busy ? 'Syncing…' : 'Sync now'}
+				</Button>
+			</div>
+			{#if sync.lastResult}
+				<p class="text-xs text-board-100/60">
+					Last run: pushed {sync.lastResult.pushedCount}, pulled {sync.lastResult.pulledCount}.
+				</p>
+			{/if}
+			{#if sync.error}
+				<p class="text-sm text-danger-500" role="alert">{sync.error}</p>
+			{/if}
+		</section>
+
 		<section class="rounded-lg border border-board-700 bg-board-800 p-4 text-sm text-board-100/70">
 			<h2 class="mb-2 text-sm font-semibold tracking-wider text-board-100/70 uppercase">
-				Sync &amp; access
+				Access control
 			</h2>
 			<p>
-				This app is local-first. Matches and stats stay on this device in your browser's storage.
-				Cross-device sync is not yet implemented.
-			</p>
-			<p class="mt-2">
-				If the app is served behind an authenticating reverse proxy (e.g. PocketID via Ingress
-				forward-auth), access control is handled there — the app itself does not require login.
+				This app does not handle authentication itself. When served behind an authenticating reverse
+				proxy (e.g. PocketID via Ingress forward-auth), the proxy gates access and the sync
+				endpoints read the identity header to scope data per user.
 			</p>
 		</section>
 	{/if}

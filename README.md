@@ -47,8 +47,11 @@ Or pull the published image:
 
 ```sh
 docker pull ghcr.io/yan-imensar/dartist:latest
-docker run --rm -p 3000:3000 ghcr.io/yan-imensar/dartist:latest
+docker run --rm -p 3000:3000 -v dartist-data:/data ghcr.io/yan-imensar/dartist:latest
 ```
+
+The container persists its server-side sync database in `/data` (SQLite
+file). Mount a volume there if you want it to survive restarts.
 
 ### docker-compose example
 
@@ -63,17 +66,26 @@ services:
     ports:
       - '3000:3000'
     environment:
-      # Required when reached through a public domain so SvelteKit
-      # generates correct absolute URLs.
       ORIGIN: https://dartist.example.com
-      # Optional (defaults shown).
+      # Defaults shown:
       PORT: '3000'
       HOST: 0.0.0.0
+      DATA_DIR: /data
+      # Forward-auth header the reverse proxy sets per user (default).
+      SYNC_AUTH_HEADER: X-Forwarded-User
+      # Only useful in dev: bypass forward-auth.
+      # ALLOW_ANON_SYNC: 'true'
+      # DEV_FAKE_USER: 'me'
+    volumes:
+      - dartist-data:/data
     healthcheck:
       test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/']
       interval: 30s
       timeout: 3s
       retries: 3
+
+volumes:
+  dartist-data:
 ```
 
 Bring it up:
@@ -84,9 +96,19 @@ docker compose up -d
 
 ### Kubernetes
 
-Minimal Deployment + Service. Save as `dartist.yaml` and `kubectl apply -f dartist.yaml`. Wire your own Ingress / reverse proxy in front of the Service.
+Minimal Deployment + Service + PVC. Save as `dartist.yaml` and `kubectl apply -f dartist.yaml`. Wire your own Ingress / reverse proxy in front of the Service.
 
 ```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dartist-data
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -94,6 +116,8 @@ metadata:
   labels: { app: dartist }
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels: { app: dartist }
   template:
@@ -109,6 +133,13 @@ spec:
           env:
             - name: ORIGIN
               value: https://dartist.example.com
+            - name: DATA_DIR
+              value: /data
+            - name: SYNC_AUTH_HEADER
+              value: X-Forwarded-User
+          volumeMounts:
+            - name: data
+              mountPath: /data
           readinessProbe:
             httpGet: { path: /, port: 3000 }
             periodSeconds: 10
@@ -118,6 +149,10 @@ spec:
           resources:
             requests: { cpu: 25m, memory: 64Mi }
             limits: { cpu: 250m, memory: 256Mi }
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: dartist-data
 ---
 apiVersion: v1
 kind: Service

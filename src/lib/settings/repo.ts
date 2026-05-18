@@ -1,6 +1,12 @@
 import type { DartistDb } from '$lib/db/client';
 import { getDb } from '$lib/db/client';
-import { DEFAULT_SETTINGS, SETTINGS_KEYS, type AppSettings, type SettingsKey } from './types';
+import {
+	DEFAULT_SETTINGS,
+	SETTINGS_KEYS,
+	type AppSettings,
+	type SettingsKey,
+	type TurnEntryMode
+} from './types';
 
 export class SettingsRepository {
 	constructor(private readonly db: DartistDb = getDb()) {}
@@ -25,7 +31,11 @@ export class SettingsRepository {
 			deviceName:
 				(map.get(SETTINGS_KEYS.deviceName) as string | undefined) ?? DEFAULT_SETTINGS.deviceName,
 			lastSyncedAt:
-				(map.get(SETTINGS_KEYS.lastSyncedAt) as string | undefined) ?? DEFAULT_SETTINGS.lastSyncedAt
+				(map.get(SETTINGS_KEYS.lastSyncedAt) as string | undefined) ??
+				DEFAULT_SETTINGS.lastSyncedAt,
+			turnEntryMode:
+				(map.get(SETTINGS_KEYS.turnEntryMode) as TurnEntryMode | undefined) ??
+				DEFAULT_SETTINGS.turnEntryMode
 		};
 	}
 }

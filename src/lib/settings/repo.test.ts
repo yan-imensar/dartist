@@ -18,7 +18,7 @@ describe('SettingsRepository', () => {
 
 	it('returns default values when no settings are stored', async () => {
 		const settings = await repo.loadAll();
-		expect(settings).toEqual({ deviceName: null, lastSyncedAt: null });
+		expect(settings).toEqual({ deviceName: null, lastSyncedAt: null, turnEntryMode: 'total' });
 	});
 
 	it('round-trips a typed value through set/get', async () => {

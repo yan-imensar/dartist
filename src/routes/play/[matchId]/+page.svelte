@@ -4,17 +4,23 @@
 	import RecentTurns from '$lib/ui/RecentTurns.svelte';
 	import ScorePanel from '$lib/ui/ScorePanel.svelte';
 	import TurnEntry from '$lib/ui/TurnEntry.svelte';
+	import TurnEntryPerDart from '$lib/ui/TurnEntryPerDart.svelte';
 	import { getActiveMatchStore } from '$lib/stores/active-match.svelte';
+	import { SettingsRepository } from '$lib/settings/repo';
+	import { SETTINGS_KEYS, type TurnEntryMode } from '$lib/settings/types';
+	import type { DartThrow } from '$lib/game/types';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 
 	const store = getActiveMatchStore();
+	const settingsRepo = new SettingsRepository();
 	const matchId = $derived(page.params.matchId);
 
 	let pendingDoubleConfirm = $state<number | null>(null);
 	let hydrating = $state(true);
+	let entryMode = $state<TurnEntryMode>('total');
 
 	const snapshot = $derived(store.snapshot);
 	const currentPlayer = $derived.by(() => {
@@ -30,6 +36,9 @@
 	});
 
 	onMount(async () => {
+		const settings = await settingsRepo.loadAll();
+		entryMode = settings.turnEntryMode;
+
 		if (!matchId) {
 			hydrating = false;
 			return;
@@ -47,6 +56,11 @@
 			hydrating = false;
 		}
 	});
+
+	async function setEntryMode(mode: TurnEntryMode) {
+		entryMode = mode;
+		await settingsRepo.set(SETTINGS_KEYS.turnEntryMode, mode);
+	}
 
 	async function submit(value: number, confirmDoubleFinish = false) {
 		if (!snapshot) return;
@@ -67,6 +81,16 @@
 			return;
 		}
 		await submit(value);
+	}
+
+	async function onSubmitDarts(darts: DartThrow[]) {
+		if (!snapshot) return;
+		const value = darts.reduce((sum, d) => sum + d.score, 0);
+		try {
+			await store.playTurn({ scoreEntered: value, darts });
+		} catch {
+			// store.error is exposed in UI
+		}
 	}
 
 	async function onMiss() {
@@ -124,6 +148,23 @@
 
 		<CheckoutHint score={currentScore} />
 
+		{#if snapshot.status === 'active'}
+			<div class="flex gap-1 self-end rounded-full bg-board-800 p-1 text-xs">
+				{#each [{ id: 'total', label: 'Total' }, { id: 'per-dart', label: 'Per dart' }] as opt (opt.id)}
+					<button
+						type="button"
+						class="rounded-full px-3 py-1 transition {entryMode === opt.id
+							? 'bg-accent-500 text-board-900'
+							: 'text-board-100/70 hover:text-board-50'}"
+						onclick={() => setEntryMode(opt.id as TurnEntryMode)}
+						aria-pressed={entryMode === opt.id}
+					>
+						{opt.label}
+					</button>
+				{/each}
+			</div>
+		{/if}
+
 		{#if snapshot.status === 'finished'}
 			<div
 				class="flex flex-col gap-3 rounded-2xl border border-accent-500 bg-accent-500/10 p-4 text-center"
@@ -148,6 +189,14 @@
 					<Button onclick={confirmFinishDouble}>Yes (checkout)</Button>
 				</div>
 			</div>
+		{:else if entryMode === 'per-dart'}
+			<TurnEntryPerDart
+				disabled={store.busy}
+				maxDarts={snapshot.settings.maxDartsPerTurn ?? 3}
+				onsubmit={onSubmitDarts}
+				onmiss={onMiss}
+				onundo={onUndo}
+			/>
 		{:else}
 			<TurnEntry disabled={store.busy} onsubmit={onSubmit} onmiss={onMiss} onundo={onUndo} />
 		{/if}

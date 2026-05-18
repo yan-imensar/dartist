@@ -37,7 +37,7 @@
 
 	function submit() {
 		if (darts.length === 0) return;
-		const payload = darts;
+		const payload = $state.snapshot(darts) as DartThrow[];
 		darts = [];
 		onsubmit(payload);
 	}

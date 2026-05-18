@@ -51,6 +51,10 @@ export class TurnsRepository {
 		return rows.sort((a, b) => a.turnIndex - b.turnIndex);
 	}
 
+	listAll(): Promise<Turn[]> {
+		return this.db.turns.toArray();
+	}
+
 	async lastActive(matchId: string): Promise<Turn | undefined> {
 		const rows = await this.db.turns.where('matchId').equals(matchId).toArray();
 		const active = rows.filter((t) => t.revertedAt === null);

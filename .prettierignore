@@ -8,3 +8,5 @@ bun.lockb
 # Miscellaneous
 /static/
 SPEC.md
+/build/
+/.claude/

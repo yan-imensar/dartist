@@ -10,6 +10,7 @@
 		{ href: resolve('/play'), label: 'Play' },
 		{ href: resolve('/players'), label: 'Players' },
 		{ href: resolve('/history'), label: 'History' },
+		{ href: resolve('/stats'), label: 'Stats' },
 		{ href: resolve('/settings'), label: 'Settings' }
 	];
 

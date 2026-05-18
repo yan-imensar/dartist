@@ -127,4 +127,16 @@ export class MatchesRepository {
 		const rows = await this.db.matches.where('status').equals('finished').toArray();
 		return rows.sort((a, b) => (b.finishedAt ?? '').localeCompare(a.finishedAt ?? ''));
 	}
+
+	listAll(): Promise<Match[]> {
+		return this.db.matches.toArray();
+	}
+
+	listAllMatchPlayers(): Promise<MatchPlayer[]> {
+		return this.db.matchPlayers.toArray();
+	}
+
+	listAllLegs(): Promise<Leg[]> {
+		return this.db.legs.toArray();
+	}
 }

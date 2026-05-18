@@ -1,21 +1,16 @@
 export const SETTINGS_KEYS = {
-	pocketbaseUrl: 'pocketbaseUrl',
-	oauthProvider: 'oauthProvider',
+	deviceName: 'deviceName',
 	lastSyncedAt: 'lastSyncedAt'
 } as const;
 
 export type SettingsKey = (typeof SETTINGS_KEYS)[keyof typeof SETTINGS_KEYS];
 
 export type AppSettings = {
-	pocketbaseUrl: string | null;
-	oauthProvider: string;
+	deviceName: string | null;
 	lastSyncedAt: string | null;
 };
 
-export const DEFAULT_OAUTH_PROVIDER = 'oidc';
-
 export const DEFAULT_SETTINGS: AppSettings = {
-	pocketbaseUrl: null,
-	oauthProvider: DEFAULT_OAUTH_PROVIDER,
+	deviceName: null,
 	lastSyncedAt: null
 };

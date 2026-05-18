@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createTestDb, type TestHarness } from '$lib/db/test-utils';
 import { SettingsRepository } from './repo';
-import { DEFAULT_OAUTH_PROVIDER, SETTINGS_KEYS } from './types';
+import { SETTINGS_KEYS } from './types';
 
 describe('SettingsRepository', () => {
 	let harness: TestHarness;
@@ -18,32 +18,19 @@ describe('SettingsRepository', () => {
 
 	it('returns default values when no settings are stored', async () => {
 		const settings = await repo.loadAll();
-		expect(settings).toEqual({
-			pocketbaseUrl: null,
-			oauthProvider: DEFAULT_OAUTH_PROVIDER,
-			lastSyncedAt: null
-		});
+		expect(settings).toEqual({ deviceName: null, lastSyncedAt: null });
 	});
 
 	it('round-trips a typed value through set/get', async () => {
-		await repo.set(SETTINGS_KEYS.pocketbaseUrl, 'https://darts.example.com');
-		const value = await repo.get<string>(SETTINGS_KEYS.pocketbaseUrl);
-		expect(value).toBe('https://darts.example.com');
-	});
-
-	it('exposes merged settings in loadAll()', async () => {
-		await repo.set(SETTINGS_KEYS.pocketbaseUrl, 'https://darts.example.com');
-		await repo.set(SETTINGS_KEYS.oauthProvider, 'oidc2');
-		const settings = await repo.loadAll();
-		expect(settings.pocketbaseUrl).toBe('https://darts.example.com');
-		expect(settings.oauthProvider).toBe('oidc2');
-		expect(settings.lastSyncedAt).toBeNull();
+		await repo.set(SETTINGS_KEYS.deviceName, 'Kitchen tablet');
+		const value = await repo.get<string>(SETTINGS_KEYS.deviceName);
+		expect(value).toBe('Kitchen tablet');
 	});
 
 	it('delete() removes a key and falls back to default', async () => {
-		await repo.set(SETTINGS_KEYS.pocketbaseUrl, 'https://x');
-		await repo.delete(SETTINGS_KEYS.pocketbaseUrl);
+		await repo.set(SETTINGS_KEYS.deviceName, 'Phone');
+		await repo.delete(SETTINGS_KEYS.deviceName);
 		const settings = await repo.loadAll();
-		expect(settings.pocketbaseUrl).toBeNull();
+		expect(settings.deviceName).toBeNull();
 	});
 });

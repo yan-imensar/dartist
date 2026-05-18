@@ -1,124 +1,80 @@
 <script lang="ts">
 	import Button from '$lib/ui/Button.svelte';
-	import { getAuthStore } from '$lib/auth/auth-store.svelte';
+	import { SettingsRepository } from '$lib/settings/repo';
+	import { SETTINGS_KEYS } from '$lib/settings/types';
 	import { onMount } from 'svelte';
 
-	const auth = getAuthStore();
+	const repo = new SettingsRepository();
 
-	let urlDraft = $state('');
-	let providerDraft = $state('');
+	let deviceName = $state('');
+	let saved = $state<string | null>(null);
 	let ready = $state(false);
 
 	onMount(async () => {
-		await auth.hydrate();
-		urlDraft = auth.snapshot.url ?? '';
-		providerDraft = auth.provider;
+		const settings = await repo.loadAll();
+		deviceName = settings.deviceName ?? '';
+		saved = settings.deviceName;
 		ready = true;
 	});
 
-	async function saveUrl(event: SubmitEvent) {
+	async function saveDeviceName(event: SubmitEvent) {
 		event.preventDefault();
-		await auth.setUrl(urlDraft);
-	}
-
-	async function saveProvider() {
-		if (!providerDraft.trim()) return;
-		await auth.setProvider(providerDraft);
-	}
-
-	async function login() {
-		try {
-			await auth.login();
-		} catch {
-			// auth.error is rendered below
+		const cleaned = deviceName.trim();
+		if (cleaned) {
+			await repo.set(SETTINGS_KEYS.deviceName, cleaned);
+		} else {
+			await repo.delete(SETTINGS_KEYS.deviceName);
 		}
-	}
-
-	function logout() {
-		auth.logout();
-	}
-
-	function userLabel(): string {
-		const u = auth.snapshot.user;
-		if (!u) return '';
-		return (
-			(u.name as string | undefined) ??
-			(u.email as string | undefined) ??
-			(u.username as string | undefined) ??
-			u.id
-		);
+		saved = cleaned || null;
 	}
 </script>
 
 <section class="flex flex-col gap-6">
 	<header>
 		<h1 class="text-2xl font-bold">Settings</h1>
-		<p class="text-sm text-board-100/70">Configure your PocketBase backend and sign in.</p>
+		<p class="text-sm text-board-100/70">Local preferences for this device.</p>
 	</header>
 
 	{#if !ready}
 		<p class="text-sm text-board-100/60">Loading…</p>
 	{:else}
-		<form class="flex flex-col gap-2" onsubmit={saveUrl}>
-			<label class="text-sm font-semibold tracking-wider text-board-100/70 uppercase" for="pb-url">
-				PocketBase URL
-			</label>
-			<div class="flex gap-2">
-				<input
-					id="pb-url"
-					type="url"
-					bind:value={urlDraft}
-					placeholder="https://darts.example.com"
-					class="flex-1 rounded-lg border border-board-700 bg-board-800 px-3 py-2 text-board-50 placeholder:text-board-100/40 focus:border-accent-500 focus:outline-none"
-					autocomplete="url"
-				/>
-				<Button type="submit" disabled={auth.busy}>Save</Button>
-			</div>
-			<p class="text-xs text-board-100/50">
-				Leave empty to disable sync. Your local matches stay on this device regardless.
-			</p>
-		</form>
-
-		<form class="flex flex-col gap-2" onsubmit={(e) => (e.preventDefault(), saveProvider())}>
+		<form class="flex flex-col gap-2" onsubmit={saveDeviceName}>
 			<label
 				class="text-sm font-semibold tracking-wider text-board-100/70 uppercase"
-				for="oauth-provider"
+				for="device-name"
 			>
-				OAuth2 provider name
+				Device name
 			</label>
 			<div class="flex gap-2">
 				<input
-					id="oauth-provider"
+					id="device-name"
 					type="text"
-					bind:value={providerDraft}
-					placeholder="oidc"
+					bind:value={deviceName}
+					placeholder="Kitchen tablet, Phone…"
 					class="flex-1 rounded-lg border border-board-700 bg-board-800 px-3 py-2 text-board-50 placeholder:text-board-100/40 focus:border-accent-500 focus:outline-none"
+					maxlength="32"
 				/>
-				<Button type="submit" variant="secondary" disabled={auth.busy}>Save</Button>
+				<Button type="submit">Save</Button>
 			</div>
-			<p class="text-xs text-board-100/50">
-				Matches the provider configured in PocketBase admin (Auth providers → OIDC).
-			</p>
+			{#if saved}
+				<p class="text-xs text-board-100/50">
+					Saved as <span class="text-board-50">{saved}</span>.
+				</p>
+			{/if}
 		</form>
 
-		<section class="flex flex-col gap-2 rounded-lg border border-board-700 bg-board-800 p-4">
-			<h2 class="text-sm font-semibold tracking-wider text-board-100/70 uppercase">Account</h2>
-			{#if !auth.snapshot.configured}
-				<p class="text-sm text-board-100/60">Set a PocketBase URL above to enable login.</p>
-			{:else if auth.snapshot.authenticated}
-				<p class="text-sm">
-					Signed in as <span class="font-semibold text-accent-500">{userLabel()}</span>
-				</p>
-				<Button variant="secondary" onclick={logout}>Sign out</Button>
-			{:else}
-				<p class="text-sm text-board-100/70">Sign in with PocketID to enable sync (coming next).</p>
-				<Button onclick={login} disabled={auth.busy}>
-					{auth.busy ? 'Opening sign-in…' : 'Sign in with PocketID'}
-				</Button>
-			{/if}
-			{#if auth.error}
-				<p class="text-sm text-danger-500" role="alert">{auth.error}</p>
-			{/if}
+		<section class="rounded-lg border border-board-700 bg-board-800 p-4 text-sm text-board-100/70">
+			<h2 class="mb-2 text-sm font-semibold tracking-wider text-board-100/70 uppercase">
+				Sync &amp; access
+			</h2>
+			<p>
+				This app is local-first. Matches and stats stay on this device in your browser's storage.
+				Cross-device sync is not yet implemented.
+			</p>
+			<p class="mt-2">
+				If the app is served behind an authenticating reverse proxy (e.g. PocketID via Ingress
+				forward-auth), access control is handled there — the app itself does not require login.
+			</p>
 		</section>
 	{/if}
 </section>

@@ -22,11 +22,10 @@ export class SettingsRepository {
 		const rows = await this.db.settings.toArray();
 		const map = new Map(rows.map((r) => [r.key, r.value]));
 		return {
-			pocketbaseUrl:
-				(map.get(SETTINGS_KEYS.pocketbaseUrl) as string) ?? DEFAULT_SETTINGS.pocketbaseUrl,
-			oauthProvider:
-				(map.get(SETTINGS_KEYS.oauthProvider) as string) ?? DEFAULT_SETTINGS.oauthProvider,
-			lastSyncedAt: (map.get(SETTINGS_KEYS.lastSyncedAt) as string) ?? DEFAULT_SETTINGS.lastSyncedAt
+			deviceName:
+				(map.get(SETTINGS_KEYS.deviceName) as string | undefined) ?? DEFAULT_SETTINGS.deviceName,
+			lastSyncedAt:
+				(map.get(SETTINGS_KEYS.lastSyncedAt) as string | undefined) ?? DEFAULT_SETTINGS.lastSyncedAt
 		};
 	}
 }

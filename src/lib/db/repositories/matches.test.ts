@@ -66,6 +66,29 @@ describe('MatchesRepository', () => {
 		expect(leg?.winnerPlayerId).toBe(a.id);
 	});
 
+	it('findActive returns the in-progress match', async () => {
+		const [a] = await makePlayers(['Solo']);
+		expect(await harness.repos.matches.findActive()).toBeUndefined();
+		const { match } = await harness.repos.matches.start({
+			mode: 'x01',
+			playerIds: [a.id]
+		});
+		const active = await harness.repos.matches.findActive();
+		expect(active?.id).toBe(match.id);
+	});
+
+	it('abandon marks the match as abandoned', async () => {
+		const [a] = await makePlayers(['Solo']);
+		const { match } = await harness.repos.matches.start({
+			mode: 'x01',
+			playerIds: [a.id]
+		});
+		await harness.repos.matches.abandon(match.id);
+		const reloaded = await harness.repos.matches.get(match.id);
+		expect(reloaded?.status).toBe('abandoned');
+		expect(await harness.repos.matches.findActive()).toBeUndefined();
+	});
+
 	it('listFinished returns finished matches newest first', async () => {
 		const [a] = await makePlayers(['Solo']);
 		const { match: m1 } = await harness.repos.matches.start({

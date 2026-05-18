@@ -2,7 +2,7 @@
 	import Button from '$lib/ui/Button.svelte';
 	import { createRepositories } from '$lib/db/repositories';
 	import { defaultX01Settings } from '$lib/game/x01';
-	import type { Player } from '$lib/db/schema';
+	import type { Match, Player } from '$lib/db/schema';
 	import { getActiveMatchStore } from '$lib/stores/active-match.svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
@@ -16,9 +16,15 @@
 	let startingScore = $state<301 | 501>(501);
 	let doubleOut = $state(true);
 	let loading = $state(true);
+	let activeMatch = $state<Match | null>(null);
 
 	onMount(async () => {
-		players = await repos.players.listActive();
+		const [list, current] = await Promise.all([
+			repos.players.listActive(),
+			repos.matches.findActive()
+		]);
+		players = list;
+		activeMatch = current ?? null;
 		loading = false;
 	});
 
@@ -35,12 +41,44 @@
 		const matchId = store.snapshot?.matchId;
 		if (matchId) await goto(resolve('/play/[matchId]', { matchId }));
 	}
+
+	async function continueActive() {
+		if (!activeMatch) return;
+		await goto(resolve('/play/[matchId]', { matchId: activeMatch.id }));
+	}
+
+	async function discardActive() {
+		if (!activeMatch) return;
+		await repos.matches.abandon(activeMatch.id);
+		if (store.snapshot?.matchId === activeMatch.id) store.clear();
+		activeMatch = null;
+	}
 </script>
 
 <section class="flex flex-col gap-6">
 	<header>
 		<h1 class="text-2xl font-bold">New match</h1>
 	</header>
+
+	{#if activeMatch}
+		<aside
+			class="flex flex-col gap-3 rounded-2xl border border-accent-500 bg-accent-500/10 p-4"
+			aria-label="Active match"
+		>
+			<div>
+				<p class="text-sm font-semibold tracking-wider text-accent-500 uppercase">
+					Match in progress
+				</p>
+				<p class="text-sm text-board-100/70">
+					Started {new Date(activeMatch.startedAt ?? activeMatch.createdAt).toLocaleString()}.
+				</p>
+			</div>
+			<div class="flex gap-2">
+				<Button onclick={continueActive}>Continue</Button>
+				<Button variant="secondary" onclick={discardActive}>Discard</Button>
+			</div>
+		</aside>
+	{/if}
 
 	<fieldset class="flex flex-col gap-2">
 		<legend class="text-sm font-semibold tracking-wider text-board-100/70 uppercase">

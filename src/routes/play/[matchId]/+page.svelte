@@ -8,11 +8,13 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import { onMount } from 'svelte';
 
 	const store = getActiveMatchStore();
 	const matchId = $derived(page.params.matchId);
 
 	let pendingDoubleConfirm = $state<number | null>(null);
+	let hydrating = $state(true);
 
 	const snapshot = $derived(store.snapshot);
 	const currentPlayer = $derived.by(() => {
@@ -27,10 +29,22 @@
 		return map;
 	});
 
-	$effect(() => {
-		if (!matchId) return;
-		if (!snapshot || snapshot.matchId !== matchId) {
-			goto(resolve('/play'));
+	onMount(async () => {
+		if (!matchId) {
+			hydrating = false;
+			return;
+		}
+		if (store.snapshot?.matchId === matchId) {
+			hydrating = false;
+			return;
+		}
+		try {
+			await store.loadFromDb(matchId);
+		} catch {
+			await goto(resolve('/play'));
+			return;
+		} finally {
+			hydrating = false;
 		}
 	});
 
@@ -74,7 +88,7 @@
 	}
 </script>
 
-{#if !snapshot}
+{#if hydrating || !snapshot}
 	<p class="pt-8 text-center text-board-100/70">Loading match…</p>
 {:else}
 	<section class="flex flex-col gap-4">

@@ -34,6 +34,14 @@ export class ActiveMatchStore {
 		});
 	}
 
+	async loadFromDb(matchId: string): Promise<void> {
+		if (this.#snapshot?.matchId === matchId && this.#session) return;
+		await this.#run(async () => {
+			this.#session = await MatchSession.load(this.repos, matchId);
+			this.#snapshot = this.#session.state;
+		});
+	}
+
 	async playTurn(input: PlayTurnInput): Promise<void> {
 		const session = this.#requireSession();
 		await this.#run(async () => {

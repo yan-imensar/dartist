@@ -66,3 +66,72 @@ describe('MatchSession', () => {
 		expect(turns[0].revertedAt).not.toBeNull();
 	});
 });
+
+describe('MatchSession.load', () => {
+	let harness: TestHarness;
+
+	beforeEach(async () => {
+		harness = await createTestDb();
+	});
+
+	afterEach(async () => {
+		await harness.close();
+	});
+
+	it('rebuilds a multi-turn active match from persisted rows', async () => {
+		const a = await harness.repos.players.create({ name: 'Alice' });
+		const b = await harness.repos.players.create({ name: 'Bob' });
+		const original = await MatchSession.start(harness.repos, {
+			mode: 'x01',
+			playerIds: [a.id, b.id],
+			settings: defaultX01Settings(501)
+		});
+		await original.playTurn({ scoreEntered: 60 });
+		await original.playTurn({ scoreEntered: 100 });
+		await original.playTurn({ scoreEntered: 45 });
+
+		const reloaded = await MatchSession.load(harness.repos, original.state.matchId);
+		expect(reloaded.state.turns).toHaveLength(3);
+		expect(reloaded.state.scores).toEqual({ [a.id]: 396, [b.id]: 401 });
+		expect(reloaded.state.currentPlayerIndex).toBe(1);
+		expect(reloaded.state.status).toBe('active');
+	});
+
+	it('rebuilds a finished match with the original winner', async () => {
+		const solo = await harness.repos.players.create({ name: 'Solo' });
+		const original = await MatchSession.start(harness.repos, {
+			mode: 'x01',
+			playerIds: [solo.id],
+			settings: defaultX01Settings(40)
+		});
+		await original.playTurn({
+			scoreEntered: 40,
+			darts: [{ segment: 20, multiplier: 2, score: 40 }]
+		});
+
+		const reloaded = await MatchSession.load(harness.repos, original.state.matchId);
+		expect(reloaded.state.status).toBe('finished');
+		expect(reloaded.state.winnerPlayerId).toBe(solo.id);
+		expect(reloaded.state.scores[solo.id]).toBe(0);
+	});
+
+	it('ignores reverted turns when rebuilding', async () => {
+		const solo = await harness.repos.players.create({ name: 'Solo' });
+		const original = await MatchSession.start(harness.repos, {
+			mode: 'x01',
+			playerIds: [solo.id],
+			settings: defaultX01Settings(501)
+		});
+		await original.playTurn({ scoreEntered: 60 });
+		await original.playTurn({ scoreEntered: 180 });
+		await original.undoLast();
+
+		const reloaded = await MatchSession.load(harness.repos, original.state.matchId);
+		expect(reloaded.state.turns).toHaveLength(1);
+		expect(reloaded.state.scores[solo.id]).toBe(441);
+	});
+
+	it('throws when the match does not exist', async () => {
+		await expect(MatchSession.load(harness.repos, 'missing')).rejects.toThrow(/missing/);
+	});
+});

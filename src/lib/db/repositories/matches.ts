@@ -128,6 +128,21 @@ export class MatchesRepository {
 		return rows.sort((a, b) => (b.finishedAt ?? '').localeCompare(a.finishedAt ?? ''));
 	}
 
+	findActive(): Promise<Match | undefined> {
+		return this.db.matches.where('status').equals('active').first();
+	}
+
+	async abandon(matchId: string): Promise<void> {
+		const match = await this.db.matches.get(matchId);
+		if (!match) return;
+		await this.db.matches.put({
+			...match,
+			status: 'abandoned',
+			updatedAt: nowIso(),
+			syncState: match.syncState === 'synced' ? 'pending' : match.syncState
+		});
+	}
+
 	listAll(): Promise<Match[]> {
 		return this.db.matches.toArray();
 	}
